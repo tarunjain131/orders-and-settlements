@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { listOrders } from "@/lib/orders";
+import { getCurrentUser } from "@/lib/auth";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDate, formatMoney } from "@/lib/format";
 
@@ -19,10 +21,13 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
   const params = await searchParams;
   const q = params.q ?? "";
   const status = params.status ?? "any";
-  const orders = await listOrders({ q, status });
+  const orders = await listOrders(user.id, { q, status });
 
   return (
     <div className="flex-1 flex flex-col">

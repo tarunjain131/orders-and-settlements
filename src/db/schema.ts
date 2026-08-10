@@ -25,8 +25,18 @@ export const transactionKindEnum = pgEnum("transaction_kind", [
   "refund",
 ]);
 
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(), // e.g. "#1001"
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
@@ -112,7 +122,12 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const ordersRelations = relations(orders, ({ many }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
   lineItems: many(lineItems),
   refunds: many(refunds),
   transactions: many(transactions),

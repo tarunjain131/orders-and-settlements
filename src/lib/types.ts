@@ -49,6 +49,16 @@ export const refundInputSchema = z.object({
 // an additional payment, or a new order.
 export const EDITABLE_STATUSES = ["pending", "partially_paid"] as const;
 
+export const signupInputSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const loginInputSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
 export type FinancialStatus =
   | "pending"
   | "partially_paid"

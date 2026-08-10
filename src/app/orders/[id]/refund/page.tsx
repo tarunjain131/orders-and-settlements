@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getOrder } from "@/lib/orders";
+import { getCurrentUser } from "@/lib/auth";
 import RefundForm from "@/components/RefundForm";
 import { formatMoney } from "@/lib/format";
 
@@ -10,8 +11,11 @@ export default async function RefundPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
   const { id } = await params;
-  const order = await getOrder(Number(id));
+  const order = await getOrder(Number(id), user.id);
   if (!order) notFound();
 
   const refundable = Math.max(

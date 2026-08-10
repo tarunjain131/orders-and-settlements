@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getOrder, isEditable } from "@/lib/orders";
+import { getCurrentUser } from "@/lib/auth";
 import OrderForm from "@/components/OrderForm";
 
 export default async function EditOrderPage({
@@ -9,8 +10,11 @@ export default async function EditOrderPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
   const { id } = await params;
-  const order = await getOrder(Number(id));
+  const order = await getOrder(Number(id), user.id);
   if (!order) notFound();
 
   const editable = isEditable(order.financialStatus);

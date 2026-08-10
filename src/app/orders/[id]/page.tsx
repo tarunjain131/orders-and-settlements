@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, Pencil } from "lucide-react";
 import { getOrder, isEditable } from "@/lib/orders";
+import { getCurrentUser } from "@/lib/auth";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDate, formatMoney } from "@/lib/format";
 import MarkAsPaidButton from "@/components/MarkAsPaidButton";
@@ -12,8 +13,11 @@ export default async function OrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
   const { id } = await params;
-  const order = await getOrder(Number(id));
+  const order = await getOrder(Number(id), user.id);
   if (!order) notFound();
 
   const currency = order.currency;

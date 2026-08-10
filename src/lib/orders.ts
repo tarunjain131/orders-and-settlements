@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql, SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   lineItems,
@@ -48,8 +48,11 @@ function statusForPayment(amountPaid: number, total: number): FinancialStatus {
   return "partially_paid";
 }
 
-export async function listOrders(opts: { q?: string; status?: string } = {}) {
-  const conditions = [];
+export async function listOrders(
+  userId: number,
+  opts: { q?: string; status?: string } = {}
+) {
+  const conditions: (SQL | undefined)[] = [eq(orders.userId, userId)];
   if (opts.q) {
     conditions.push(
       or(
@@ -72,16 +75,16 @@ export async function listOrders(opts: { q?: string; status?: string } = {}) {
     })
     .from(orders)
     .leftJoin(lineItems, eq(lineItems.orderId, orders.id))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .groupBy(orders.id)
     .orderBy(desc(orders.createdAt));
 
   return rows.map((r) => ({ ...r.order, itemCount: Number(r.itemCount) }));
 }
 
-export async function getOrder(id: number) {
+export async function getOrder(id: number, userId: number) {
   const order = await db.query.orders.findFirst({
-    where: eq(orders.id, id),
+    where: and(eq(orders.id, id), eq(orders.userId, userId)),
     with: {
       lineItems: true,
       refunds: { with: { refundLineItems: true } },
@@ -91,7 +94,7 @@ export async function getOrder(id: number) {
   return order ?? null;
 }
 
-export async function createOrder(input: OrderInput) {
+export async function createOrder(userId: number, input: OrderInput) {
   const { subtotal, total } = computeTotals(
     input.lineItems,
     input.discountAmount,
@@ -106,6 +109,7 @@ export async function createOrder(input: OrderInput) {
     const [order] = await tx
       .insert(orders)
       .values({
+        userId,
         name: "#TEMP",
         customerName: input.customerName,
         customerEmail: input.customerEmail || null,
@@ -156,10 +160,14 @@ export async function createOrder(input: OrderInput) {
   });
 }
 
-export async function updateOrder(id: number, input: OrderInput) {
+export async function updateOrder(
+  id: number,
+  userId: number,
+  input: OrderInput
+) {
   return db.transaction(async (tx) => {
     const existing = await tx.query.orders.findFirst({
-      where: eq(orders.id, id),
+      where: and(eq(orders.id, id), eq(orders.userId, userId)),
     });
     if (!existing) throw new OrderError("Order not found", 404);
     if (!isEditable(existing.financialStatus)) {
@@ -212,18 +220,19 @@ export async function updateOrder(id: number, input: OrderInput) {
       );
     }
 
-    return getOrder(id);
+    return getOrder(id, userId);
   });
 }
 
 export async function recordPayment(
   id: number,
+  userId: number,
   amount: number,
   note?: string | null
 ) {
   return db.transaction(async (tx) => {
     const existing = await tx.query.orders.findFirst({
-      where: eq(orders.id, id),
+      where: and(eq(orders.id, id), eq(orders.userId, userId)),
     });
     if (!existing) throw new OrderError("Order not found", 404);
     if (existing.financialStatus === "voided") {
@@ -258,12 +267,13 @@ export async function recordPayment(
       note: note || null,
     });
 
-    return getOrder(id);
+    return getOrder(id, userId);
   });
 }
 
 export async function createRefund(
   id: number,
+  userId: number,
   input: {
     amount: number;
     reason?: string | null;
@@ -273,7 +283,7 @@ export async function createRefund(
 ) {
   return db.transaction(async (tx) => {
     const existing = await tx.query.orders.findFirst({
-      where: eq(orders.id, id),
+      where: and(eq(orders.id, id), eq(orders.userId, userId)),
     });
     if (!existing) throw new OrderError("Order not found", 404);
 
@@ -343,14 +353,14 @@ export async function createRefund(
       note: input.reason || input.note || null,
     });
 
-    return getOrder(id);
+    return getOrder(id, userId);
   });
 }
 
-export async function voidOrder(id: number) {
+export async function voidOrder(id: number, userId: number) {
   return db.transaction(async (tx) => {
     const existing = await tx.query.orders.findFirst({
-      where: eq(orders.id, id),
+      where: and(eq(orders.id, id), eq(orders.userId, userId)),
     });
     if (!existing) throw new OrderError("Order not found", 404);
     if (Number(existing.amountPaid) > 0) {
@@ -371,6 +381,6 @@ export async function voidOrder(id: number) {
       .set({ financialStatus: "voided", updatedAt: new Date() })
       .where(eq(orders.id, id));
 
-    return getOrder(id);
+    return getOrder(id, userId);
   });
 }

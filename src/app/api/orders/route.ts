@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrder, listOrders } from "@/lib/orders";
 import { orderInputSchema } from "@/lib/types";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") || undefined;
   const status = searchParams.get("status") || undefined;
-  const data = await listOrders({ q, status });
+  const data = await listOrders(user.id, { q, status });
   return NextResponse.json({ orders: data });
 }
 
 export async function POST(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
   const parsed = orderInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -20,7 +31,7 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    const order = await createOrder(parsed.data);
+    const order = await createOrder(user.id, parsed.data);
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
