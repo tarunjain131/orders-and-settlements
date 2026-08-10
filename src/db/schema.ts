@@ -5,6 +5,7 @@ import {
   integer,
   numeric,
   timestamp,
+  date,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -42,11 +43,13 @@ export const orders = pgTable("orders", {
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
   currency: text("currency").notNull().default("INR"),
-  note: text("note"),
+  description: text("description"),
+  dueDate: date("due_date").notNull(),
 
   subtotalAmount: numeric("subtotal_amount", { precision: 12, scale: 2 })
     .notNull()
     .default("0"),
+  // Vestigial for this assignment — order total is subtotal-only (see README).
   discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
     .notNull()
     .default("0"),
@@ -80,7 +83,7 @@ export const lineItems = pgTable("line_items", {
   orderId: integer("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
+  description: text("description").notNull(),
   variantTitle: text("variant_title"),
   sku: text("sku"),
   quantity: integer("quantity").notNull(),

@@ -6,7 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 
 type LineItemRow = {
-  title: string;
+  description: string;
   variantTitle: string;
   sku: string;
   quantity: number;
@@ -18,15 +18,13 @@ type OrderFormValues = {
   customerEmail: string;
   customerPhone: string;
   currency: string;
-  note: string;
-  discountAmount: number;
-  shippingAmount: number;
-  taxAmount: number;
+  description: string;
+  dueDate: string;
   lineItems: LineItemRow[];
 };
 
 const EMPTY_ITEM: LineItemRow = {
-  title: "",
+  description: "",
   variantTitle: "",
   sku: "",
   quantity: 1,
@@ -48,10 +46,8 @@ export default function OrderForm({
     customerEmail: initialValues?.customerEmail ?? "",
     customerPhone: initialValues?.customerPhone ?? "",
     currency: initialValues?.currency ?? "INR",
-    note: initialValues?.note ?? "",
-    discountAmount: initialValues?.discountAmount ?? 0,
-    shippingAmount: initialValues?.shippingAmount ?? 0,
-    taxAmount: initialValues?.taxAmount ?? 0,
+    description: initialValues?.description ?? "",
+    dueDate: initialValues?.dueDate ?? "",
     lineItems: initialValues?.lineItems?.length
       ? initialValues.lineItems
       : [{ ...EMPTY_ITEM }],
@@ -71,13 +67,7 @@ export default function OrderForm({
       ),
     [values.lineItems]
   );
-  const total = Math.max(
-    subtotal -
-      (Number(values.discountAmount) || 0) +
-      (Number(values.shippingAmount) || 0) +
-      (Number(values.taxAmount) || 0),
-    0
-  );
+  const total = subtotal;
 
   function updateItem(index: number, patch: Partial<LineItemRow>) {
     setValues((v) => ({
@@ -103,9 +93,9 @@ export default function OrderForm({
     e.preventDefault();
     setError(null);
 
-    const cleanedItems = values.lineItems.filter((li) => li.title.trim());
+    const cleanedItems = values.lineItems.filter((li) => li.description.trim());
     if (cleanedItems.length === 0) {
-      setError("Add at least one line item with a title.");
+      setError("Add at least one line item with a description.");
       return;
     }
 
@@ -114,10 +104,8 @@ export default function OrderForm({
       customerEmail: values.customerEmail || null,
       customerPhone: values.customerPhone || null,
       currency: values.currency,
-      note: values.note || null,
-      discountAmount: values.discountAmount,
-      shippingAmount: values.shippingAmount,
-      taxAmount: values.taxAmount,
+      description: values.description || null,
+      dueDate: values.dueDate,
       lineItems: cleanedItems,
       initialPayment:
         mode === "create"
@@ -192,6 +180,31 @@ export default function OrderForm({
             />
           </Field>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+          <Field label="Due date" required>
+            <input
+              type="date"
+              className="input"
+              value={values.dueDate}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, dueDate: e.target.value }))
+              }
+              required
+            />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Description">
+            <textarea
+              className="input"
+              rows={2}
+              value={values.description}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, description: e.target.value }))
+              }
+            />
+          </Field>
+        </div>
       </section>
 
       <section className="bg-white rounded-lg border border-gray-200 p-5">
@@ -214,9 +227,9 @@ export default function OrderForm({
             >
               <input
                 className="input col-span-5"
-                placeholder="Item title"
-                value={li.title}
-                onChange={(e) => updateItem(i, { title: e.target.value })}
+                placeholder="Item description"
+                value={li.description}
+                onChange={(e) => updateItem(i, { description: e.target.value })}
               />
               <input
                 className="input col-span-2"
@@ -264,50 +277,6 @@ export default function OrderForm({
 
       <section className="bg-white rounded-lg border border-gray-200 p-5">
         <h2 className="font-medium mb-4">Amounts</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <Field label="Discount">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="input"
-              value={values.discountAmount}
-              onChange={(e) =>
-                setValues((v) => ({
-                  ...v,
-                  discountAmount: Number(e.target.value),
-                }))
-              }
-            />
-          </Field>
-          <Field label="Shipping">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="input"
-              value={values.shippingAmount}
-              onChange={(e) =>
-                setValues((v) => ({
-                  ...v,
-                  shippingAmount: Number(e.target.value),
-                }))
-              }
-            />
-          </Field>
-          <Field label="Tax">
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="input"
-              value={values.taxAmount}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, taxAmount: Number(e.target.value) }))
-              }
-            />
-          </Field>
-        </div>
         <div className="flex justify-end">
           <div className="w-64 text-sm space-y-1">
             <div className="flex justify-between text-gray-600">

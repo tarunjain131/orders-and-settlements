@@ -18,3 +18,10 @@ export function formatDate(date: string | Date) {
     timeStyle: "short",
   }).format(d);
 }
+
+export function formatDateOnly(date: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(date));
+}

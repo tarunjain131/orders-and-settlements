@@ -6,7 +6,7 @@ import { formatMoney } from "@/lib/format";
 
 type LineItem = {
   id: number;
-  title: string;
+  description: string;
   sku: string | null;
   price: number;
   quantity: number;
@@ -104,7 +104,7 @@ export default function RefundForm({
             {lineItems.map((li) => (
               <tr key={li.id}>
                 <td className="px-4 py-3">
-                  <div className="font-medium text-gray-800">{li.title}</div>
+                  <div className="font-medium text-gray-800">{li.description}</div>
                   <div className="text-xs text-gray-500">
                     {li.remainingQuantity} of {li.quantity} refundable
                   </div>

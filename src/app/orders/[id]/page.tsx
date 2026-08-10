@@ -4,9 +4,10 @@ import { ChevronLeft, Pencil } from "lucide-react";
 import { getOrder, isEditable } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/auth";
 import StatusBadge from "@/components/StatusBadge";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatDateOnly, formatMoney } from "@/lib/format";
 import MarkAsPaidButton from "@/components/MarkAsPaidButton";
 import VoidButton from "@/components/VoidButton";
+import DeleteOrderButton from "@/components/DeleteOrderButton";
 
 export default async function OrderDetailPage({
   params,
@@ -38,6 +39,7 @@ export default async function OrderDetailPage({
     order.financialStatus !== "voided" &&
     order.financialStatus !== "refunded";
   const canRefund = refundable > 0;
+  const canDelete = amountPaid === 0;
 
   const events = [
     ...order.transactions.map((t) => ({
@@ -76,7 +78,8 @@ export default async function OrderDetailPage({
           <section className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
               <h2 className="font-medium">
-                Placed {formatDate(order.createdAt)}
+                Placed {formatDate(order.createdAt)} · Due{" "}
+                {formatDateOnly(order.dueDate)}
               </h2>
             </div>
             <table className="w-full text-sm">
@@ -92,7 +95,7 @@ export default async function OrderDetailPage({
                 {order.lineItems.map((li) => (
                   <tr key={li.id}>
                     <td className="px-5 py-3">
-                      <div className="font-medium text-gray-800">{li.title}</div>
+                      <div className="font-medium text-gray-800">{li.description}</div>
                       {(li.variantTitle || li.sku) && (
                         <div className="text-xs text-gray-500">
                           {li.variantTitle}
@@ -215,13 +218,13 @@ export default async function OrderDetailPage({
                 <div className="text-gray-600">{order.customerPhone}</div>
               )}
             </div>
-            {order.note && (
+            {order.description && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                  Note
+                  Description
                 </h3>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {order.note}
+                  {order.description}
                 </p>
               </div>
             )}
@@ -253,7 +256,9 @@ export default async function OrderDetailPage({
 
             {canVoid && <VoidButton orderId={order.id} />}
 
-            {!canPay && !canRefund && !canVoid && (
+            {canDelete && <DeleteOrderButton orderId={order.id} />}
+
+            {!canPay && !canRefund && !canVoid && !canDelete && (
               <p className="text-sm text-gray-500">
                 No further payment actions are available for this order.
               </p>

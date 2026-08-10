@@ -25,13 +25,11 @@ async function main() {
     customerEmail: "priya.sharma@example.com",
     customerPhone: "+91 98765 43210",
     currency: "INR",
-    note: "Please pack in eco-friendly packaging.",
-    discountAmount: 0,
-    shippingAmount: 60,
-    taxAmount: 0,
+    description: "Please pack in eco-friendly packaging.",
+    dueDate: "2026-08-17",
     lineItems: [
-      { title: "Wireless Mouse", sku: "WM-100", quantity: 1, price: 799 },
-      { title: "USB-C Cable 1m", sku: "USBC-1M", quantity: 2, price: 249 },
+      { description: "Wireless Mouse", sku: "WM-100", quantity: 1, price: 799 },
+      { description: "USB-C Cable 1m", sku: "USBC-1M", quantity: 2, price: 249 },
     ],
     initialPayment: 0,
   });
@@ -42,12 +40,10 @@ async function main() {
     customerEmail: "arjun.mehta@example.com",
     customerPhone: "+91 90000 11122",
     currency: "INR",
-    note: null,
-    discountAmount: 100,
-    shippingAmount: 0,
-    taxAmount: 45,
+    description: null,
+    dueDate: "2026-08-17",
     lineItems: [
-      { title: "Cotton T-Shirt (M)", sku: "TS-M-BLK", quantity: 3, price: 499 },
+      { description: "Cotton T-Shirt (M)", sku: "TS-M-BLK", quantity: 3, price: 499 },
     ],
     initialPayment: 1000000, // will be clamped to total by createOrder
   });
@@ -58,13 +54,11 @@ async function main() {
     customerEmail: "sneha.rao@example.com",
     customerPhone: null,
     currency: "INR",
-    note: "Gift wrap requested",
-    discountAmount: 0,
-    shippingAmount: 50,
-    taxAmount: 0,
+    description: "Gift wrap requested",
+    dueDate: "2026-08-17",
     lineItems: [
-      { title: "Ceramic Mug", sku: "MUG-01", quantity: 4, price: 349 },
-      { title: "Coaster Set", sku: "COAST-01", quantity: 1, price: 299 },
+      { description: "Ceramic Mug", sku: "MUG-01", quantity: 4, price: 349 },
+      { description: "Coaster Set", sku: "COAST-01", quantity: 1, price: 299 },
     ],
     initialPayment: 800,
   });
@@ -75,12 +69,10 @@ async function main() {
     customerEmail: "vikram.singh@example.com",
     customerPhone: "+91 99887 76655",
     currency: "INR",
-    note: null,
-    discountAmount: 0,
-    shippingAmount: 0,
-    taxAmount: 0,
+    description: null,
+    dueDate: "2026-08-17",
     lineItems: [
-      { title: "Bluetooth Speaker", sku: "BT-SPK-02", quantity: 1, price: 2499 },
+      { description: "Bluetooth Speaker", sku: "BT-SPK-02", quantity: 1, price: 2499 },
     ],
     initialPayment: 2499,
   });
@@ -97,11 +89,9 @@ async function main() {
     customerEmail: "anita.desai@example.com",
     customerPhone: null,
     currency: "INR",
-    note: null,
-    discountAmount: 0,
-    shippingAmount: 0,
-    taxAmount: 0,
-    lineItems: [{ title: "Notebook Set", sku: "NB-SET", quantity: 2, price: 199 }],
+    description: null,
+    dueDate: "2026-08-17",
+    lineItems: [{ description: "Notebook Set", sku: "NB-SET", quantity: 2, price: 199 }],
     initialPayment: 0,
   });
   const { voidOrder } = await import("@/lib/orders");

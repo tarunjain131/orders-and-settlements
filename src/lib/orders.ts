@@ -25,17 +25,12 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-function computeTotals(
-  items: { quantity: number; price: number }[],
-  discount: number,
-  shipping: number,
-  tax: number
-) {
+function computeTotals(items: { quantity: number; price: number }[]) {
+  // No order-level discount/shipping/tax in this assignment's spec — total is subtotal-only.
   const subtotal = round2(
     items.reduce((sum, li) => sum + li.quantity * li.price, 0)
   );
-  const total = round2(subtotal - discount + shipping + tax);
-  return { subtotal, total: Math.max(total, 0) };
+  return { subtotal, total: subtotal };
 }
 
 export function isEditable(financialStatus: string) {
@@ -95,12 +90,7 @@ export async function getOrder(id: number, userId: number) {
 }
 
 export async function createOrder(userId: number, input: OrderInput) {
-  const { subtotal, total } = computeTotals(
-    input.lineItems,
-    input.discountAmount,
-    input.shippingAmount,
-    input.taxAmount
-  );
+  const { subtotal, total } = computeTotals(input.lineItems);
 
   const initialPayment = Math.min(round2(input.initialPayment ?? 0), total);
   const financialStatus = statusForPayment(initialPayment, total);
@@ -115,11 +105,12 @@ export async function createOrder(userId: number, input: OrderInput) {
         customerEmail: input.customerEmail || null,
         customerPhone: input.customerPhone || null,
         currency: input.currency || "INR",
-        note: input.note || null,
+        description: input.description || null,
+        dueDate: input.dueDate,
         subtotalAmount: subtotal.toFixed(2),
-        discountAmount: input.discountAmount.toFixed(2),
-        shippingAmount: input.shippingAmount.toFixed(2),
-        taxAmount: input.taxAmount.toFixed(2),
+        discountAmount: "0",
+        shippingAmount: "0",
+        taxAmount: "0",
         totalAmount: total.toFixed(2),
         amountPaid: initialPayment.toFixed(2),
         amountRefunded: "0",
@@ -135,7 +126,7 @@ export async function createOrder(userId: number, input: OrderInput) {
       await tx.insert(lineItems).values(
         input.lineItems.map((li) => ({
           orderId: order.id,
-          title: li.title,
+          description: li.description,
           variantTitle: li.variantTitle || null,
           sku: li.sku || null,
           quantity: li.quantity,
@@ -177,12 +168,7 @@ export async function updateOrder(
       );
     }
 
-    const { subtotal, total } = computeTotals(
-      input.lineItems,
-      input.discountAmount,
-      input.shippingAmount,
-      input.taxAmount
-    );
+    const { subtotal, total } = computeTotals(input.lineItems);
 
     const amountPaid = Math.min(Number(existing.amountPaid), total);
     const financialStatus = statusForPayment(amountPaid, total);
@@ -194,11 +180,9 @@ export async function updateOrder(
         customerEmail: input.customerEmail || null,
         customerPhone: input.customerPhone || null,
         currency: input.currency || existing.currency,
-        note: input.note || null,
+        description: input.description || null,
+        dueDate: input.dueDate,
         subtotalAmount: subtotal.toFixed(2),
-        discountAmount: input.discountAmount.toFixed(2),
-        shippingAmount: input.shippingAmount.toFixed(2),
-        taxAmount: input.taxAmount.toFixed(2),
         totalAmount: total.toFixed(2),
         amountPaid: amountPaid.toFixed(2),
         financialStatus,
@@ -211,7 +195,7 @@ export async function updateOrder(
       await tx.insert(lineItems).values(
         input.lineItems.map((li) => ({
           orderId: id,
-          title: li.title,
+          description: li.description,
           variantTitle: li.variantTitle || null,
           sku: li.sku || null,
           quantity: li.quantity,
@@ -382,5 +366,22 @@ export async function voidOrder(id: number, userId: number) {
       .where(eq(orders.id, id));
 
     return getOrder(id, userId);
+  });
+}
+
+export async function deleteOrder(id: number, userId: number) {
+  return db.transaction(async (tx) => {
+    const existing = await tx.query.orders.findFirst({
+      where: and(eq(orders.id, id), eq(orders.userId, userId)),
+    });
+    if (!existing) throw new OrderError("Order not found", 404);
+    if (Number(existing.amountPaid) > 0) {
+      throw new OrderError(
+        "This order can't be deleted because it has a recorded payment.",
+        409
+      );
+    }
+
+    await tx.delete(orders).where(eq(orders.id, id));
   });
 }

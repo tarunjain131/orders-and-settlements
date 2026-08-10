@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrder, updateOrder } from "@/lib/orders";
+import { deleteOrder, getOrder, updateOrder } from "@/lib/orders";
 import { orderInputSchema } from "@/lib/types";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -45,6 +45,28 @@ export async function PUT(
     const status = (err as { status?: number }).status ?? 500;
     return NextResponse.json(
       { error: (err as Error).message || "Failed to update order" },
+      { status }
+    );
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  try {
+    await deleteOrder(Number(id), user.id);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500;
+    return NextResponse.json(
+      { error: (err as Error).message || "Failed to delete order" },
       { status }
     );
   }

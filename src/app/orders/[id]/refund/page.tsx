@@ -37,7 +37,7 @@ export default async function RefundPage({
 
   const lineItems = order.lineItems.map((li) => ({
     id: li.id,
-    title: li.title,
+    description: li.description,
     sku: li.sku,
     price: Number(li.price),
     quantity: li.quantity,

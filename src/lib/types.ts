@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const lineItemInputSchema = z.object({
-  title: z.string().min(1, "Item title is required"),
+  description: z.string().min(1, "Item description is required"),
   variantTitle: z.string().optional().nullable(),
   sku: z.string().optional().nullable(),
   quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
@@ -13,10 +13,8 @@ export const orderInputSchema = z.object({
   customerEmail: z.string().email().optional().or(z.literal("")).nullable(),
   customerPhone: z.string().optional().nullable(),
   currency: z.string().min(1).default("INR"),
-  note: z.string().optional().nullable(),
-  discountAmount: z.coerce.number().min(0).default(0),
-  shippingAmount: z.coerce.number().min(0).default(0),
-  taxAmount: z.coerce.number().min(0).default(0),
+  description: z.string().optional().nullable(),
+  dueDate: z.string().min(1, "Due date is required"),
   lineItems: z.array(lineItemInputSchema).min(1, "Add at least one line item"),
   // How much of the order total is being paid at creation time.
   // 0 -> pending, between 0 and total -> partially_paid, == total -> paid

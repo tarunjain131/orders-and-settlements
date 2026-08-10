@@ -55,22 +55,26 @@ Visit http://localhost:3000/orders.
 
 - **Order list** (`/orders`) — searchable, filterable by payment status,
   Shopify-admin-style table.
-- **Create order** (`/orders/new`) — customer details, dynamic line items
-  (add/remove rows, quantity × price), discount/shipping/tax, and a choice
-  of leaving the order unpaid, marking it fully paid, or recording a partial
-  payment at creation time.
+- **Create order** (`/orders/new`) — customer details, a required due date
+  (when payment is expected), an order description, dynamic line items
+  (add/remove rows, quantity × price), and a choice of leaving the order
+  unpaid, marking it fully paid, or recording a partial payment at creation
+  time.
 - **Order detail** (`/orders/[id]`) — line items, payment summary (subtotal,
-  discount, shipping, tax, total, paid, refunded, balance due), a timeline
-  of payments/refunds, and the available actions for that order's current
-  status.
+  total, paid, refunded, balance due), a timeline of payments/refunds, and
+  the available actions for that order's current status.
 - **Edit order** (`/orders/[id]/edit`) — re-open the same form to change the
-  customer, line items, or amounts, subject to the edit-lock rule below.
+  customer, due date, description, or line items, subject to the edit-lock
+  rule below.
 - **Record a payment** (`/orders/[id]/pay`) — log a full or partial payment
   against the balance due.
 - **Refund** (`/orders/[id]/refund`) — refund specific line-item quantities
   and/or an extra amount (e.g. shipping), with a reason and note. Refund
   amount is capped at what's actually been paid and not yet refunded.
 - **Void** — cancel an order that has no payment captured yet.
+- **Delete** — permanently remove an order that has zero payments recorded
+  (`amount_paid = 0`), with a confirm step. Once any payment has been made,
+  deletion is blocked — void or refund instead.
 
 ## 4. Business rules (and how they map to Shopify)
 
@@ -81,13 +85,14 @@ implement. The subset used here is:
 `pending → partially_paid → paid → partially_refunded → refunded`, plus
 `voided` as a terminal state for orders that never took a payment.
 
-**Editing after creation.** This was the main behavioral question in
-building this app, and it's implemented to mirror Shopify's real
-constraint: once an order has been paid in full, you can't silently change
-what's in it. Concretely:
+### Is an order editable after payment?
 
-- An order is editable (line items, quantities, prices, discount/shipping/
-  tax, customer info) while its status is `pending` or `partially_paid`.
+This was the main behavioral question in building this app, and it's
+implemented to mirror Shopify's real constraint: once an order has been
+paid **in full**, you can't silently change what's in it. Concretely:
+
+- An order is editable (line items, quantities, prices, customer info, due
+  date, description) while its status is `pending` or `partially_paid`.
 - Once status is `paid`, `partially_refunded`, `refunded`, or `voided`, the
   Edit page shows a locked banner instead of the form, and the API rejects
   edit requests with a 409. From that point, changes have to go through a
@@ -96,6 +101,15 @@ what's in it. Concretely:
 - The server enforces this independently of the UI (the `PUT
   /api/orders/[id]` route re-checks status before writing), so it can't be
   bypassed by calling the API directly.
+
+The order is locked only once it's **fully** paid — not the moment the
+first payment lands. This is a deliberate choice: it lets you record
+partial payments against an order over time (e.g. a deposit, then the
+balance later) without losing the ability to fix a typo in a line item or
+adjust the due date before the order is fully settled. Locking on the
+first rupee received would make partial-payment workflows unnecessarily
+painful, since almost any real order with an installment plan would become
+uneditable immediately.
 
 **Refunds.** A refund can be issued for any amount up to (paid − already
 refunded). You can select specific line-item quantities to refund (this is
@@ -107,6 +121,20 @@ refunded total catches up to the paid total.
 **Voiding.** Only allowed while an order is `pending` with nothing paid
 against it — matching Shopify, where you can't void an order that's already
 collected money; you'd refund it instead.
+
+**Deleting.** Only allowed while an order has zero payments recorded
+(`amount_paid = 0`) — the same "nothing paid yet" bar as voiding. Once a
+single payment exists against an order, `DELETE /api/orders/[id]` returns a
+409 and the Delete button is hidden; use void (if still `pending`) or a
+refund instead.
+
+**Order totals.** Per this assignment's spec, an order's total is its
+**subtotal only** — there's no order-level discount, shipping, or tax. The
+`discount_amount`, `shipping_amount`, and `tax_amount` columns are still
+present on the `orders` table (left in place rather than dropped, for
+simplicity) but are vestigial: they're always `0`, the create/edit form has
+no inputs for them, and `createOrder`/`updateOrder` don't accept nonzero
+values for them.
 
 ## 5. Project structure
 
@@ -130,8 +158,8 @@ src/
 
 - Authentication / multi-user accounts
 - Fulfillment / shipping tracking
-- Product catalog (line items are freeform title/SKU/price/qty, not linked
-  to a products table)
+- Product catalog (line items are freeform description/SKU/price/qty, not
+  linked to a products table)
 - Payment gateway integration — "recording a payment" or "refund" just
   updates the ledger in this app; it doesn't move real money anywhere
 
