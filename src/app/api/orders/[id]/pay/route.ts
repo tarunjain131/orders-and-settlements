@@ -2,25 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { recordPayment } from "@/lib/orders";
 import { paymentInputSchema } from "@/lib/types";
 import { getCurrentUser } from "@/lib/auth";
+import { fromCaughtError, unauthorized, validationError } from "@/lib/api-error";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return unauthorized();
 
   const { id } = await params;
   const body = await req.json();
   const parsed = paymentInputSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
-      { status: 400 }
-    );
-  }
+  if (!parsed.success) return validationError(parsed.error);
   try {
     const order = await recordPayment(
       Number(id),
@@ -31,10 +25,6 @@ export async function POST(
     );
     return NextResponse.json({ order });
   } catch (err) {
-    const status = (err as { status?: number }).status ?? 500;
-    return NextResponse.json(
-      { error: (err as Error).message || "Failed to record payment" },
-      { status }
-    );
+    return fromCaughtError(err, "Failed to record payment");
   }
 }

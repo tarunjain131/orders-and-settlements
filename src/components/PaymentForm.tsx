@@ -28,7 +28,7 @@ export default function PaymentForm({
         body: JSON.stringify({ amount, paidOn, note: note || null }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to record payment");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to record payment");
       router.push(`/orders/${orderId}`);
       router.refresh();
     } catch (err) {

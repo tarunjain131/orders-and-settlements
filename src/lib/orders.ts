@@ -104,9 +104,6 @@ export async function listOrders(
       )
     );
   }
-  if (opts.status && opts.status !== "any") {
-    conditions.push(eq(orders.financialStatus, opts.status as FinancialStatus));
-  }
 
   const rows = await db
     .select({
@@ -122,11 +119,21 @@ export async function listOrders(
     .orderBy(desc(orders.createdAt));
 
   const now = new Date();
-  return rows.map((r) => ({
+  const mapped = rows.map((r) => ({
     ...r.order,
     itemCount: Number(r.itemCount),
     displayStatus: deriveOrderStatus(r.order, now),
   }));
+
+  // Status filtering happens here, against the derived status, not a SQL
+  // WHERE on the stored column — "overdue" doesn't exist as a stored value,
+  // and filtering by e.g. "pending" should exclude orders that are actually
+  // overdue, same as what's shown in the UI.
+  if (opts.status && opts.status !== "any") {
+    return mapped.filter((o) => o.displayStatus === opts.status);
+  }
+
+  return mapped;
 }
 
 export async function getOrder(id: number, userId: number) {

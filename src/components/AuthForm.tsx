@@ -25,7 +25,7 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       );
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error?.message || "Something went wrong");
       }
       router.push("/orders");
       router.refresh();

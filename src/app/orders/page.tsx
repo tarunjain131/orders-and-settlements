@@ -4,11 +4,12 @@ import { Plus, Search } from "lucide-react";
 import { listOrders } from "@/lib/orders";
 import { getCurrentUser } from "@/lib/auth";
 import StatusBadge from "@/components/StatusBadge";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDateOnly, formatMoney } from "@/lib/format";
 
 const STATUS_TABS = [
   { value: "any", label: "All" },
   { value: "pending", label: "Pending" },
+  { value: "overdue", label: "Overdue" },
   { value: "partially_paid", label: "Partially paid" },
   { value: "paid", label: "Paid" },
   { value: "partially_refunded", label: "Partially refunded" },
@@ -91,41 +92,50 @@ export default async function OrdersPage({
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Order</th>
-                  <th className="text-left font-medium px-4 py-3">Date</th>
                   <th className="text-left font-medium px-4 py-3">Customer</th>
-                  <th className="text-left font-medium px-4 py-3">Payment status</th>
-                  <th className="text-right font-medium px-4 py-3">Items</th>
+                  <th className="text-left font-medium px-4 py-3">Status</th>
+                  <th className="text-left font-medium px-4 py-3">Due date</th>
                   <th className="text-right font-medium px-4 py-3">Total</th>
+                  <th className="text-right font-medium px-4 py-3">Paid</th>
+                  <th className="text-right font-medium px-4 py-3">Balance due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="font-medium text-emerald-700 hover:underline"
-                      >
-                        {order.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatDate(order.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-800">
-                      {order.customerName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={order.displayStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-600">
-                      {order.itemCount}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatMoney(order.totalAmount, order.currency)}
-                    </td>
-                  </tr>
-                ))}
+                {orders.map((order) => {
+                  const total = Number(order.totalAmount);
+                  const paid = Number(order.amountPaid);
+                  const balanceDue = Math.max(total - paid, 0);
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/orders/${order.id}`}
+                          className="font-medium text-emerald-700 hover:underline"
+                        >
+                          {order.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-gray-800">
+                        {order.customerName}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={order.displayStatus} />
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatDateOnly(order.dueDate)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatMoney(total, order.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-600">
+                        {formatMoney(paid, order.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatMoney(balanceDue, order.currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

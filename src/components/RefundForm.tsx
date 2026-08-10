@@ -71,7 +71,7 @@ export default function RefundForm({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create refund");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to create refund");
       router.push(`/orders/${orderId}`);
       router.refresh();
     } catch (err) {

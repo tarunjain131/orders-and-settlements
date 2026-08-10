@@ -129,7 +129,7 @@ export default function OrderForm({
       );
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error?.message || "Something went wrong");
       }
       router.push(`/orders/${data.order.id}`);
       router.refresh();

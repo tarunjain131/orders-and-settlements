@@ -28,7 +28,7 @@ export default function MarkAsPaidButton({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to record payment");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to record payment");
       router.refresh();
     } catch (err) {
       setError((err as Error).message);

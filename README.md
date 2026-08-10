@@ -9,6 +9,18 @@ or `voided`) through refunds and edits.
 Stack: **Next.js (App Router) + TypeScript + Tailwind CSS + Drizzle ORM +
 PostgreSQL**.
 
+## Contents
+
+1. [Prerequisites](#1-prerequisites)
+2. [Setup](#2-setup)
+3. [What's included](#3-whats-included)
+4. [Business rules (and how they map to Shopify)](#4-business-rules-and-how-they-map-to-shopify)
+   - [Is an order editable after payment?](#is-an-order-editable-after-payment)
+5. [Order status: derivation and edge cases](#5-order-status-derivation-and-edge-cases)
+6. [API reference](#6-api-reference)
+7. [Project structure](#7-project-structure)
+8. [Not included](#8-not-included-intentionally-to-keep-this-a-small-app)
+
 ## 1. Prerequisites
 
 - Node.js 20+
@@ -20,8 +32,14 @@ PostgreSQL**.
 ```bash
 npm install
 cp .env.example .env
-# edit .env and set DATABASE_URL to point at your Postgres instance
 ```
+
+Edit `.env` and set:
+
+- `DATABASE_URL` — pointing at your Postgres instance.
+- `AUTH_SECRET` — a random 32+ byte value used to sign session cookies.
+  `.env.example` has a one-liner to generate one:
+  `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 Create the database (skip if it already exists):
 
@@ -43,13 +61,17 @@ and voided examples):
 npm run db:seed
 ```
 
+This also creates a demo login — `demo@example.com` / `password123` — so
+you can sign in immediately instead of visiting `/signup` first.
+
 Run the app:
 
 ```bash
 npm run dev
 ```
 
-Visit http://localhost:3000/orders.
+Visit http://localhost:3000/orders and sign in (or go to `/signup` if you
+skipped `db:seed`).
 
 ## 3. What's included
 
@@ -185,7 +207,153 @@ purely a *display*-time concern layered on top.
   order that happens to be past its due date is still shown as `refunded`,
   never `overdue`.
 
-## 6. Project structure
+## 6. API reference
+
+All `/api/orders*` routes require a logged-in session. Signing up or
+logging in sets an httpOnly `session` cookie (a JWT signed with
+`AUTH_SECRET`) — there's no `Authorization` header to manage; a browser
+handles the cookie automatically, and curl needs `-c`/`-b` to persist it
+across requests (see the walkthrough below).
+
+### Error shape
+
+Every endpoint that can fail returns errors in the same shape, built by
+the shared helper in `src/lib/api-error.ts`:
+
+```json
+{
+  "error": {
+    "message": "Human-readable summary",
+    "code": "optional_machine_code",
+    "fields": { "fieldName": "Field-specific message" }
+  }
+}
+```
+
+`code` and `fields` are both optional. `fields` is only present on `400`
+validation failures — one message per invalid field, keyed by field name
+(or dotted path for nested fields like `lineItems.0.quantity`).
+
+### Endpoints
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/api/auth/signup` | none | Creates an account, logs you in |
+| POST | `/api/auth/login` | none | Logs in |
+| POST | `/api/auth/logout` | none | Clears the session cookie |
+| GET | `/api/orders` | required | List/search/filter your orders |
+| POST | `/api/orders` | required | Create an order |
+| GET | `/api/orders/[id]` | required | Get one order |
+| PUT | `/api/orders/[id]` | required | Edit an order (while editable) |
+| DELETE | `/api/orders/[id]` | required | Delete an order (while unpaid) |
+| POST | `/api/orders/[id]/pay` | required | Record a payment |
+| POST | `/api/orders/[id]/refund` | required | Issue a refund |
+| POST | `/api/orders/[id]/void` | required | Void an order |
+
+**POST /api/auth/signup**
+- Body: `{ "email": string, "password": string (min 8 chars) }`
+- Success: `201 { "user": { "id": number, "email": string } }`
+- Errors: `400` validation; `409` email already registered (`code: "email_taken"`)
+
+**POST /api/auth/login**
+- Body: `{ "email": string, "password": string }`
+- Success: `200 { "user": { "id": number, "email": string } }`
+- Errors: `400` validation; `401` invalid credentials (`code: "invalid_credentials"`)
+
+**POST /api/auth/logout**
+- Body: none
+- Success: `200 { "ok": true }`
+
+**GET /api/orders**
+- Query params: `q` (optional, searches order name / customer name / customer email), `status` (optional — `any` (default), `pending`, `overdue`, `partially_paid`, `paid`, `partially_refunded`, `refunded`, or `voided`; filters against the *derived* status, see [Order status](#5-order-status-derivation-and-edge-cases), not the raw stored column)
+- Success: `200 { "orders": Order[] }` — each order includes `displayStatus` and `itemCount`
+- Errors: `401` unauthorized
+
+**POST /api/orders**
+- Body:
+  ```json
+  {
+    "customerName": "string",
+    "customerEmail": "string | null",
+    "customerPhone": "string | null",
+    "currency": "string (default INR)",
+    "description": "string | null",
+    "dueDate": "YYYY-MM-DD",
+    "lineItems": [
+      { "description": "string", "variantTitle": "string | null", "sku": "string | null", "quantity": "number >= 1", "price": "number >= 0" }
+    ],
+    "initialPayment": "number >= 0 (default 0)"
+  }
+  ```
+- Success: `201 { "order": Order }`
+- Errors: `400` validation (e.g. missing customer name, no line items)
+
+**GET /api/orders/[id]**
+- Success: `200 { "order": Order }` — includes `lineItems`, `refunds`, `transactions`, `displayStatus`
+- Errors: `401` unauthorized; `404` not found (`code: "not_found"`) — also returned for orders that exist but belong to another user
+
+**PUT /api/orders/[id]**
+- Body: same shape as `POST /api/orders`
+- Success: `200 { "order": Order }`
+- Errors: `400` validation; `404` not found; `409` order isn't editable right now (see [editable after payment](#is-an-order-editable-after-payment))
+
+**DELETE /api/orders/[id]**
+- Success: `200 { "success": true }`
+- Errors: `404` not found; `409` order has a recorded payment
+
+**POST /api/orders/[id]/pay**
+- Body: `{ "amount": "number >= 0.01", "paidOn": "YYYY-MM-DD", "note": "string | null" }`
+- Success: `200 { "order": Order }`
+- Errors: `400` validation, or amount exceeds the balance due ("Payment of X exceeds the amount due..."); `404` not found; `409` order is `voided` or `refunded`
+
+**POST /api/orders/[id]/refund**
+- Body: `{ "amount": "number > 0", "reason": "string | null", "note": "string | null", "lineItems": [{ "lineItemId": "number", "quantity": "number" }] }`
+- Success: `200 { "order": Order }`
+- Errors: `400` validation, or amount exceeds what's refundable; `404` not found; `409` nothing left to refund
+
+**POST /api/orders/[id]/void**
+- Body: none
+- Success: `200 { "order": Order }`
+- Errors: `404` not found; `409` order has a payment captured, or isn't `pending`
+
+### curl walkthrough
+
+Cookies need to be saved and replayed across requests since sessions are
+cookie-based, not token-based — that's what `-c cookies.txt` (save) and
+`-b cookies.txt` (send) do below.
+
+```bash
+# 1. Sign up (also logs you in)
+curl -s -X POST http://localhost:3000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"email":"demo@example.com","password":"password123"}'
+
+# 2. Log in (only needed if you already have an account)
+curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"email":"demo@example.com","password":"password123"}'
+
+# 3. Create an order (uses the session cookie saved above)
+curl -s -X POST http://localhost:3000/api/orders \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "customerName": "Priya Sharma",
+    "currency": "INR",
+    "dueDate": "2026-08-20",
+    "lineItems": [{ "description": "Wireless Mouse", "quantity": 1, "price": 799 }]
+  }'
+
+# 4. Record a payment against the order (swap 1 for the id returned above)
+curl -s -X POST http://localhost:3000/api/orders/1/pay \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{ "amount": 799, "paidOn": "2026-08-15", "note": "Paid via bank transfer" }'
+```
+
+## 7. Project structure
 
 ```
 src/
@@ -196,6 +364,7 @@ src/
   lib/
     orders.ts       All order business logic (create/update/pay/refund/void)
     types.ts        Zod validation schemas + the editable-status list
+    api-error.ts     Shared { error: { message, code?, fields? } } response helper
     format.ts        Currency/date formatting helpers
   app/
     orders/...       Pages (list, create, detail, edit, pay, refund)
@@ -203,9 +372,8 @@ src/
   components/        Order form, status badge, refund/payment forms, action buttons
 ```
 
-## 7. Not included (intentionally, to keep this a "small" app)
+## 8. Not included (intentionally, to keep this a "small" app)
 
-- Authentication / multi-user accounts
 - Fulfillment / shipping tracking
 - Product catalog (line items are freeform description/SKU/price/qty, not
   linked to a products table)

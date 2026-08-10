@@ -17,7 +17,7 @@ export default function DeleteOrderButton({ orderId }: { orderId: number }) {
         method: "DELETE",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete order");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to delete order");
       router.push("/orders");
       router.refresh();
     } catch (err) {

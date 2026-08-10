@@ -17,7 +17,7 @@ export default function VoidButton({ orderId }: { orderId: number }) {
         method: "POST",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to void order");
+      if (!res.ok) throw new Error(data.error?.message || "Failed to void order");
       router.refresh();
     } catch (err) {
       setError((err as Error).message);

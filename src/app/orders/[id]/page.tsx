@@ -41,16 +41,18 @@ export default async function OrderDetailPage({
   const canRefund = refundable > 0;
   const canDelete = amountPaid === 0;
 
-  const events = [
-    ...order.transactions.map((t) => ({
+  // Payments get their own table below; the timeline only tracks the
+  // remaining lifecycle events (creation, refunds) so it doesn't duplicate
+  // what's already shown there.
+  const payments = order.transactions.filter((t) => t.kind === "sale");
+  const refundEvents = order.transactions
+    .filter((t) => t.kind === "refund")
+    .map((t) => ({
       date: t.createdAt,
-      label:
-        t.kind === "sale"
-          ? `Payment recorded: ${formatMoney(t.amount, currency)}`
-          : `Refund issued: ${formatMoney(t.amount, currency)}`,
+      label: `Refund issued: ${formatMoney(t.amount, currency)}`,
       note: t.note,
-    })),
-  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return (
     <div className="flex-1 flex flex-col">
@@ -156,7 +158,43 @@ export default async function OrderDetailPage({
             </div>
           </section>
 
-          {(events.length > 0 || order.refunds.length > 0) && (
+          {payments.length > 0 && (
+            <section className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-200">
+                <h2 className="font-medium">Payment history</h2>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-right font-medium px-5 py-2.5">Amount</th>
+                    <th className="text-left font-medium px-5 py-2.5">Date paid</th>
+                    <th className="text-left font-medium px-5 py-2.5">Note</th>
+                    <th className="text-left font-medium px-5 py-2.5">Recorded at</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payments.map((t) => (
+                    <tr key={t.id}>
+                      <td className="px-5 py-3 text-right font-medium">
+                        {formatMoney(t.amount, currency)}
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">
+                        {formatDateOnly(t.paidOn)}
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">
+                        {t.note || <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">
+                        {formatDate(t.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
+          {(refundEvents.length > 0 || order.refunds.length > 0) && (
             <section className="bg-white rounded-lg border border-gray-200 p-5">
               <h2 className="font-medium mb-3">Timeline</h2>
               <ul className="space-y-3 text-sm">
@@ -164,7 +202,7 @@ export default async function OrderDetailPage({
                   <span>Order created</span>
                   <span>{formatDate(order.createdAt)}</span>
                 </li>
-                {events.map((e, i) => (
+                {refundEvents.map((e, i) => (
                   <li key={i} className="flex justify-between text-gray-600">
                     <span>
                       {e.label}
