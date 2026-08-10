@@ -12,6 +12,7 @@ export default function PaymentForm({
 }) {
   const router = useRouter();
   const [amount, setAmount] = useState<number>(maxAmount);
+  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export default function PaymentForm({
       const res = await fetch(`/api/orders/${orderId}/pay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, note: note || null }),
+        body: JSON.stringify({ amount, paidOn, note: note || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to record payment");
@@ -54,6 +55,18 @@ export default function PaymentForm({
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
+          className="input"
+          required
+        />
+      </label>
+      <label className="block">
+        <span className="block text-xs font-medium text-gray-600 mb-1">
+          Payment date
+        </span>
+        <input
+          type="date"
+          value={paidOn}
+          onChange={(e) => setPaidOn(e.target.value)}
           className="input"
           required
         />

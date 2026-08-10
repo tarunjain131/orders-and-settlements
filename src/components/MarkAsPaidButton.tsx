@@ -21,7 +21,11 @@ export default function MarkAsPaidButton({
       const res = await fetch(`/api/orders/${orderId}/pay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, note: "Marked as fully paid" }),
+        body: JSON.stringify({
+          amount,
+          paidOn: new Date().toISOString().slice(0, 10),
+          note: "Marked as fully paid",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to record payment");

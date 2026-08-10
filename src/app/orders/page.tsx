@@ -116,7 +116,7 @@ export default async function OrdersPage({
                       {order.customerName}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={order.financialStatus} />
+                      <StatusBadge status={order.displayStatus} />
                     </td>
                     <td className="px-4 py-3 text-right text-gray-600">
                       {order.itemCount}

@@ -7,7 +7,9 @@ import {
   refunds,
   transactions,
 } from "@/db/schema";
+import { formatMoney } from "@/lib/format";
 import {
+  DisplayStatus,
   EDITABLE_STATUSES,
   FinancialStatus,
   OrderInput,
@@ -23,6 +25,10 @@ export class OrderError extends Error {
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+function todayDateString() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function computeTotals(items: { quantity: number; price: number }[]) {
@@ -41,6 +47,47 @@ function statusForPayment(amountPaid: number, total: number): FinancialStatus {
   if (amountPaid <= 0) return "pending";
   if (amountPaid >= total) return "paid";
   return "partially_paid";
+}
+
+// The bonus states from before due dates existed — an order in one of these
+// is reported as-is and never runs through the pending/overdue/paid logic
+// below (a voided or refunded order should never show as "overdue").
+const TERMINAL_STATUSES: readonly string[] = [
+  "voided",
+  "refunded",
+  "partially_refunded",
+];
+
+// Order status is derived at read time, never trusted from the stored
+// column, so "overdue" is always accurate relative to the current date.
+// Priority: paid (if fully paid, always wins) > overdue > partially_paid
+// > pending. See README "Order status: derivation and edge cases".
+export function deriveOrderStatus(
+  order: {
+    financialStatus: string;
+    totalAmount: number | string;
+    amountPaid: number | string;
+    dueDate: string;
+  },
+  now: Date = new Date()
+): DisplayStatus {
+  if (TERMINAL_STATUSES.includes(order.financialStatus)) {
+    return order.financialStatus as DisplayStatus;
+  }
+
+  const total = Number(order.totalAmount);
+  const amountPaid = Number(order.amountPaid);
+
+  if (amountPaid >= total) return "paid";
+
+  // A due date is a calendar date with no time component — "overdue"
+  // starts the day after it, compared using the server's UTC calendar date.
+  const today = now.toISOString().slice(0, 10);
+  if (today > order.dueDate) return "overdue";
+
+  if (amountPaid > 0) return "partially_paid";
+
+  return "pending";
 }
 
 export async function listOrders(
@@ -74,7 +121,12 @@ export async function listOrders(
     .groupBy(orders.id)
     .orderBy(desc(orders.createdAt));
 
-  return rows.map((r) => ({ ...r.order, itemCount: Number(r.itemCount) }));
+  const now = new Date();
+  return rows.map((r) => ({
+    ...r.order,
+    itemCount: Number(r.itemCount),
+    displayStatus: deriveOrderStatus(r.order, now),
+  }));
 }
 
 export async function getOrder(id: number, userId: number) {
@@ -86,7 +138,8 @@ export async function getOrder(id: number, userId: number) {
       transactions: { orderBy: (t, { asc }) => [asc(t.createdAt)] },
     },
   });
-  return order ?? null;
+  if (!order) return null;
+  return { ...order, displayStatus: deriveOrderStatus(order, new Date()) };
 }
 
 export async function createOrder(userId: number, input: OrderInput) {
@@ -140,6 +193,7 @@ export async function createOrder(userId: number, input: OrderInput) {
         orderId: order.id,
         kind: "sale",
         amount: initialPayment.toFixed(2),
+        paidOn: todayDateString(),
         note:
           financialStatus === "paid"
             ? "Order marked as paid at creation"
@@ -212,6 +266,7 @@ export async function recordPayment(
   id: number,
   userId: number,
   amount: number,
+  paidOn: string,
   note?: string | null
 ) {
   return db.transaction(async (tx) => {
@@ -231,7 +286,8 @@ export async function recordPayment(
     const balanceDue = round2(total - currentPaid);
     if (amount > balanceDue + 0.005) {
       throw new OrderError(
-        `Payment of ${amount} exceeds the balance due (${balanceDue})`,
+        `Payment of ${formatMoney(amount, existing.currency)} exceeds the amount due. ` +
+          `Maximum payment allowed right now is ${formatMoney(balanceDue, existing.currency)}.`,
         400
       );
     }
@@ -248,6 +304,7 @@ export async function recordPayment(
       orderId: id,
       kind: "sale",
       amount: amount.toFixed(2),
+      paidOn,
       note: note || null,
     });
 
@@ -334,6 +391,7 @@ export async function createRefund(
       orderId: id,
       kind: "refund",
       amount: input.amount.toFixed(2),
+      paidOn: todayDateString(),
       note: input.reason || input.note || null,
     });
 

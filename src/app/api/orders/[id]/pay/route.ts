@@ -26,6 +26,7 @@ export async function POST(
       Number(id),
       user.id,
       parsed.data.amount,
+      parsed.data.paidOn,
       parsed.data.note
     );
     return NextResponse.json({ order });

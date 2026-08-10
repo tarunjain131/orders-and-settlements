@@ -25,7 +25,11 @@ export type OrderInput = z.infer<typeof orderInputSchema>;
 export type LineItemInput = z.infer<typeof lineItemInputSchema>;
 
 export const paymentInputSchema = z.object({
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
+  amount: z.coerce
+    .number()
+    .min(0.01, "Amount must be at least 0.01")
+    .transform((n) => Math.round(n * 100) / 100),
+  paidOn: z.string().min(1, "Payment date is required"),
   note: z.string().optional().nullable(),
 });
 
@@ -64,3 +68,8 @@ export type FinancialStatus =
   | "partially_refunded"
   | "refunded"
   | "voided";
+
+// The status actually shown to users. Same as FinancialStatus, plus
+// "overdue" — a read-time derived state, never stored (see
+// deriveOrderStatus in lib/orders.ts and the README).
+export type DisplayStatus = FinancialStatus | "overdue";

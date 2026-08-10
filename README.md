@@ -136,7 +136,56 @@ simplicity) but are vestigial: they're always `0`, the create/edit form has
 no inputs for them, and `createOrder`/`updateOrder` don't accept nonzero
 values for them.
 
-## 5. Project structure
+## 5. Order status: derivation and edge cases
+
+The status shown in the UI (`pending`, `partially_paid`, `paid`, `overdue`,
+plus the refund/void states) is **never read off a stored column** for the
+first four values — it's computed fresh every time an order is loaded, by
+`deriveOrderStatus()` in `src/lib/orders.ts`. This is what makes "overdue"
+correct on any given day without a cron job or background update: it's a
+function of `amountPaid`, `totalAmount`, `dueDate`, and the current time,
+not a flag that gets set once and goes stale.
+
+The stored `financial_status` column still exists and is still the source
+of truth for business rules like the edit lock, void, and delete — those
+only care about pending/partially_paid/paid/refunded/voided and shouldn't
+change just because a clock ticked past midnight. `deriveOrderStatus()` is
+purely a *display*-time concern layered on top.
+
+**Priority order**, checked in this exact sequence:
+
+1. **`paid`** — if `amountPaid >= totalAmount`. This wins over everything
+   else, including a due date that's already passed.
+2. **`overdue`** — if not fully paid, and the current date is past the due
+   date.
+3. **`partially_paid`** — if not fully paid, not overdue, and
+   `amountPaid > 0`.
+4. **`pending`** — otherwise (nothing paid, not overdue).
+
+**Edge cases:**
+
+- **An order that was overdue and is then paid in full shows `paid`, not
+  `overdue`.** Rule 1 is checked before rule 2, and it wins unconditionally
+  — being fully paid always clears the overdue state, no matter how late
+  the payment was.
+- **An order that's overdue with a partial payment shows `overdue`, not
+  `partially_paid`.** Rule 2 is checked before rule 3. Overdue only loses
+  to `paid`; a partial payment doesn't buy an order out of being overdue.
+- **"Past due date" is defined precisely as:** the due date is a calendar
+  date with no time component. An order becomes overdue starting the day
+  *after* its due date — i.e. it compares today's UTC calendar date
+  (`YYYY-MM-DD`) against the due date as strings; `overdue` is true once
+  today's date is strictly greater. A payment due `2026-08-10` is not yet
+  overdue on the 10th, and becomes overdue on the 11th, evaluated in the
+  server's clock (UTC), regardless of the viewer's timezone.
+- **Refunded and voided orders never show as `overdue`, `pending`, etc.**
+  If `financial_status` is `voided`, `refunded`, or `partially_refunded`,
+  `deriveOrderStatus()` returns that value directly and skips the
+  paid/overdue/partially_paid/pending logic entirely — a fully refunded
+  order that happens to be past its due date is still shown as `refunded`,
+  never `overdue`.
+
+## 6. Project structure
 
 ```
 src/
@@ -154,7 +203,7 @@ src/
   components/        Order form, status badge, refund/payment forms, action buttons
 ```
 
-## 6. Not included (intentionally, to keep this a "small" app)
+## 7. Not included (intentionally, to keep this a "small" app)
 
 - Authentication / multi-user accounts
 - Fulfillment / shipping tracking

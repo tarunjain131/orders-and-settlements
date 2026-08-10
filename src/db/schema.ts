@@ -121,6 +121,10 @@ export const transactions = pgTable("transactions", {
     .references(() => orders.id, { onDelete: "cascade" }),
   kind: transactionKindEnum("kind").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  // The date the payment/refund actually happened, which can differ from
+  // createdAt (when it was entered into the system) — e.g. backdating a
+  // payment that was received last week.
+  paidOn: date("paid_on").notNull(),
   note: text("note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

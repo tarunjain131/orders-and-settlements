@@ -60,7 +60,7 @@ export default async function OrderDetailPage({
             <ChevronLeft size={20} />
           </Link>
           <h1 className="text-lg font-semibold">{order.name}</h1>
-          <StatusBadge status={order.financialStatus} />
+          <StatusBadge status={order.displayStatus} />
         </div>
         {editable && (
           <Link
