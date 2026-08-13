@@ -13,6 +13,13 @@ lifecycle, per-line-item refunds, status computed at read time instead
 of cached) deliberately follows patterns used by real order/fulfillment
 systems, for reasons laid out below.
 
+**Live demo:** https://orders-and-settlements-six.vercel.app/ — the
+login page comes prefilled with the demo account
+(`demo@example.com` / `password123`), so you can just hit **Log in**
+and land straight in a populated dashboard (pending, paid, partially
+paid, refunded, and voided example orders). Hosted on **Vercel**
+(app) + **Neon** (Postgres).
+
 ## Contents
 
 - [Why this project exists](#why-this-project-exists)

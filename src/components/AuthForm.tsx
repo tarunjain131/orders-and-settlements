@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(mode === "login" ? "demo@example.com" : "");
+  const [password, setPassword] = useState(mode === "login" ? "password123" : "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +40,11 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
           {error}
+        </div>
+      )}
+      {mode === "login" && (
+        <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">
+          Prefilled with the demo account — just hit Log in.
         </div>
       )}
       <label className="block">
